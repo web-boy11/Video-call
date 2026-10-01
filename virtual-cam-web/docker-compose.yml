@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Relay Server - WebSocket broker for Web UI <-> Desktop Agent
+  relay-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - ALLOWED_ORIGINS=https://your-domain.com,http://localhost:5173
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Web UI - Static files served by nginx
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - VITE_SERVER_URL=https://your-domain.com
+    depends_on:
+      relay-server:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./web-ui/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web-ui/ssl:/etc/nginx/ssl:ro
+
+  # Optional: Desktop Agent is a desktop app, not containerized
+  # Users download and run the Electron app on their machine
+
+volumes:
+  ssl:

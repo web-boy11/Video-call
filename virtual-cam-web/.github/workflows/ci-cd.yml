@@ -1,0 +1,227 @@
+# GitHub Actions CI/CD for VirtualCam Web
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Lint and type-check
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install server deps
+        run: cd virtual-cam-web/server && npm ci
+      
+      - name: Type-check server
+        run: cd virtual-cam-web/server && npx tsc --noEmit
+      
+      - name: Install web-ui deps
+        run: cd virtual-cam-web/web-ui && npm ci
+      
+      - name: Type-check web-ui
+        run: cd virtual-cam-web/web-ui && npx tsc --noEmit
+      
+      - name: Lint web-ui
+        run: cd virtual-cam-web/web-ui && npm run lint
+
+  # Build and test server
+  build-server:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install deps
+        run: cd virtual-cam-web/server && npm ci
+      
+      - name: Build
+        run: cd virtual-cam-web/server && npm run build
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-dist
+          path: virtual-cam-web/server/dist/
+
+  # Build web UI
+  build-web-ui:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install deps
+        run: cd virtual-cam-web/web-ui && npm ci
+      
+      - name: Build
+        run: cd virtual-cam-web/web-ui && npm run build
+        env:
+          VITE_SERVER_URL: https://example.com
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-ui-dist
+          path: virtual-cam-web/web-ui/dist/
+
+  # Build Docker images
+  docker:
+    runs-on: ubuntu-latest
+    needs: [build-server, build-web-ui]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata for server
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server
+          tags: |
+            type=ref,event=branch
+            type=sha
+      
+      - name: Build and push server
+        uses: docker/build-push-action@v5
+        with:
+          context: ./virtual-cam-web/server
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Extract metadata for web-ui
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-web-ui
+          tags: |
+            type=ref,event=branch
+            type=sha
+      
+      - name: Build and push web-ui
+        uses: docker/build-push-action@v5
+        with:
+          context: ./virtual-cam-web/web-ui
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build Desktop Agent (Windows)
+  build-agent-windows:
+    runs-on: windows-latest
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install deps
+        run: cd virtual-cam-web/desktop-agent && npm ci
+      
+      - name: Build
+        run: cd virtual-cam-web/desktop-agent && npm run build
+        env:
+          RELAY_SERVER_URL: https://your-server.com
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-cam-agent-windows
+          path: virtual-cam-web/desktop-agent/release/
+
+  # Build Desktop Agent (macOS)
+  build-agent-macos:
+    runs-on: macos-latest
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install deps
+        run: cd virtual-cam-web/desktop-agent && npm ci
+      
+      - name: Build
+        run: cd virtual-cam-web/desktop-agent && npm run build
+        env:
+          RELAY_SERVER_URL: https://your-server.com
+      
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-cam-agent-macos
+          path: virtual-cam-web/desktop-agent/release/
+
+  # Deploy to production (manual trigger)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/virtual-cam-web
+            docker-compose pull
+            docker-compose up -d --remove-orphans
+            docker image prune -f

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VirtualCam Agent</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        background: #1a1a2e; 
+        color: #eee; 
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .header {
+        padding: 20px;
+        background: #16213e;
+        border-bottom: 1px solid #2a2a4a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #e94560;
+      }
+      .status {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .badge.connected { background: rgba(0, 217, 165, 0.2); color: #00d9a5; }
+      .badge.disconnected { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+      .main {
+        flex: 1;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+      }
+      .card {
+        background: #16213e;
+        border: 1px solid #2a2a4a;
+        border-radius: 12px;
+        padding: 24px;
+        width: 100%;
+        max-width: 500px;
+      }
+      .card h3 {
+        margin-bottom: 16px;
+        color: #e94560;
+        font-size: 1rem;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #2a2a4a;
+      }
+      .row:last-child { border-bottom: none; }
+      .label { color: #aaa; }
+      .value { font-weight: 600; color: #eee; }
+      .value.success { color: #00d9a5; }
+      .value.warning { color: #ffd60a; }
+      .value.error { color: #ff4757; }
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .btn-primary { background: #e94560; color: white; }
+      .btn-primary:hover { background: #ff6b8a; }
+      .btn-secondary { background: #0f3460; color: #eee; border: 1px solid #2a2a4a; }
+      .btn-secondary:hover { background: #1e3a5f; }
+      .btn-group { display: flex; gap: 12px; margin-top: 16px; }
+      .info {
+        text-align: center;
+        color: #aaa;
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+      .info code { background: #0f3460; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+        VirtualCam Agent
+      </div>
+      <div class="status">
+        <span id="serverStatus" class="badge disconnected">Server: Disconnected</span>
+        <span id="obsStatus" class="badge disconnected">OBS: Disconnected</span>
+        <span id="cameraStatus" class="badge disconnected">Camera: Offline</span>
+      </div>
+    </div>
+    <main class="main">
+      <div class="card">
+        <h3>Connection</h3>
+        <div class="row"><span class="label">Agent ID</span><span id="agentId" class="value">-</span></div>
+        <div class="row"><span class="label">Client Paired</span><span id="clientPaired" class="value">No</span></div>
+        <div class="row"><span class="label">Client ID</span><span id="clientId" class="value">-</span></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="connectBtn">Connect to Server</button>
+          <button class="btn btn-secondary" id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Camera Pipeline</h3>
+        <div class="row"><span class="label">OBS Connected</span><span id="obsConnected" class="value">No</span></div>
+        <div class="row"><span class="label">Virtual Camera</span><span id="virtualCamActive" class="value">Offline</span></div>
+        <div class="row"><span class="label">Quality</span><span id="qualityValue" class="value">1080p@30fps</span></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="startCamBtn" disabled>Start Camera</button>
+          <button class="btn btn-danger" id="stopCamBtn" disabled>Stop Camera</button>
+        </div>
+      </div>
+      <div class="info">
+        <p>This agent runs in the background and connects to the <strong>VirtualCam Web UI</strong>.</p>
+        <p>Open the web control panel to configure OBS, camera, voice, and background settings.</p>
+        <p>Default server: <code>http://localhost:3001</code></p>
+      </div>
+    </main>
+    <script type="module" src="./main.jsx"></script>
+  </body>
+</html>
